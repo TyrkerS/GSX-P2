@@ -16,13 +16,13 @@ week8/
     └── nginx.conf
 ```
 
----
+
 
 ## 1. Contenidor Nginx (Frontend)
 
 
 
----
+
 
 ## 2. Contenidor de l'Aplicació Backend
 
@@ -38,7 +38,7 @@ Un servidor HTTP senzill fet amb Node.js que actua com a capa d'aplicació funci
 - **Multi-stage Builds:** El Dockerfile està dividit en una fase de compilació (`builder`) i una fase de producció. Tot i que aquesta aplicació actual és ràpida i senzilla, aquesta estructura et permet assegurar que les dependències de desenvolupament no passaran a la descàrrega de producció final.
 - **Execució sense privilegis (Non-root):** Evitem l'usuari `root` aplicant les bones pràctiques: hem creat específicament l'usuari i grup `appuser`/`appgroup` i hem indicat l'ordre de pas (`USER appuser`) just abans d'iniciar el servei.
 
----
+
 
 ## Com Construir i Executar els contenidors Localment
 
@@ -53,7 +53,9 @@ Per poder comprovar qualsevol dels contenidors al teu ordinador manualment de fo
 2. **Executa el contenidor:**
    ```bash
    # Mapegem el port de l'ordinador (80) al port del contenidor non-root (8080)
+
     docker run -p 8080:80 nginx-gsx
+   docker run -d -p 80:8080 --name gsx-frontend nginx-gsx
    ```
 3. **Verifica'l:** Obre un navegador web i navega cap a `http://localhost` (o executa `curl http://localhost`).
 
@@ -70,7 +72,7 @@ Per poder comprovar qualsevol dels contenidors al teu ordinador manualment de fo
    ```
 3. **Verifica'l:** Obre un navegador anant a `http://localhost:3000` o usa `curl http://localhost:3000`.
 
----
+
 
 ## Pujada al Docker Hub
 
