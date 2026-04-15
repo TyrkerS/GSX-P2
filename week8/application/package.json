@@ -1,0 +1,11 @@
+{
+  "name": "greendevcorp-backend",
+  "version": "1.0.0",
+  "description": "Simple backend application for GSX-P2 Week 8",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "author": "GreenDevCorp Team",
+  "license": "ISC"
+}
