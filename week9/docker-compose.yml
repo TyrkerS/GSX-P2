@@ -7,11 +7,27 @@ services:
     image: greendevcorp/nginx:week9
     container_name: greendevcorp-nginx
     ports:
-      - "${NGINX_PORT:-80}:80"
+      - "${NGINX_PORT:-80}:8080"
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8080/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
-      - greendevcorp-net
+      - frontend-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
@@ -23,10 +39,27 @@ services:
     container_name: greendevcorp-backend
     environment:
       - PORT=${BACKEND_PORT:-3000}
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -q -O - http://localhost:${BACKEND_PORT:-3000}/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
-      - greendevcorp-net
+      - frontend-net
+      - backend-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
@@ -41,12 +74,29 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
-      - greendevcorp-net
+      - backend-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
     restart: unless-stopped
 
 networks:
-  greendevcorp-net:
+  frontend-net:
+    driver: bridge
+  backend-net:
     driver: bridge
 
 volumes:

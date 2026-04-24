@@ -20,14 +20,14 @@ network and use a named volume for data persistence.
               │   - /health returns "healthy"        │
               │   - /api/ → reverse proxy to backend │
               └────────────┬─────────────────────────┘
-                           │  http://backend:3000
+                           │  [frontend-net] http://backend:3000
                            ▼
               ┌──────────────────────────────────────┐
               │   backend  (Node.js HTTP server)     │
               │   - responds with JSON               │
               │   - /health endpoint                 │
               └────────────┬─────────────────────────┘
-                           │  postgres://postgres:5432
+                           │  [backend-net] postgres://postgres:5432
                            ▼
               ┌──────────────────────────────────────┐
               │   postgres  (official image)         │
@@ -35,8 +35,7 @@ network and use a named volume for data persistence.
               │     postgres_data → /var/lib/...     │
               └──────────────────────────────────────┘
 
-          All services share the `greendevcorp-net` bridge network.
-          Service discovery by name: nginx → backend → postgres.
+          Service discovery is scoped by tier mapping. 
 ```
 
 ## Services
@@ -93,14 +92,20 @@ network and use a named volume for data persistence.
 
 ## Networking
 
-All services are attached to a user-defined bridge network
-`greendevcorp-net`. This gives us:
+We employ **Custom Networks (Tier ***)** moving away from a single default bridge to precise isolation.
 
-- **DNS by service name:** nginx reaches the backend at
-  `http://backend:3000` without hard-coded IPs.
-- **Isolation:** only the ports explicitly published in the `ports:`
-  section are reachable from the host. The backend and postgres stay
-  internal.
+- **`frontend-net`**: Shared only between `nginx` and `backend`. Nginx connects natively via `http://backend:3000`.
+- **`backend-net`**: Shared only between `backend` and `postgres`.
+- **Isolation guarantees**: The Nginx frontend has no route mapped to the database. Even if the frontend proxy is compromised, attackers cannot directly ping Postgres.
+
+## Production Constraints (Advanced & Intermediate)
+
+The updated architecture incorporates features for resilient, robust deployments mapping to higher tiers:
+
+- **Healthchecks**: Services have built-in probes (e.g. `pg_isready`, `curl`, `wget`) constantly checking availability. 
+- **Ordered Readiness**: Rather than mere start order, we use `condition: service_healthy` across Compose. For instance, `backend` will completely halt startup until Postgres emits ready status, eliminating race conditions.
+- **Resource Constraints (`deploy.resources.limits`)**: Crucial for multi-tenant scalability, we restrict compute capabilities (CPU fractions & RAM quota) per node.
+- **Log constraints (`logging`)**: We cap local logs at `json-file: 10m` to prevent docker instances from suffocating the host system over time.
 
 ## Configuration
 
@@ -212,27 +217,28 @@ following items are still open:
 
 ### Intermediate (\*\*) — recommended, bumps grade from 5–7 to 8–9
 
-- [ ] Add `healthcheck:` to each of the three services:
-  - nginx: `curl -f http://localhost/health`
+- [x] Add `healthcheck:` to each of the three services:
+  - nginx: `curl -f http://localhost:8080/health`
   - backend: `wget -q -O - http://localhost:3000/health`
   - postgres: `pg_isready -U ${POSTGRES_USER}`
-- [ ] Replace the plain `depends_on:` lists with the long form using
+- [x] Replace the plain `depends_on:` lists with the long form using
   `condition: service_healthy`, so that:
   - backend only starts once postgres is ready to accept connections.
   - nginx only starts once the backend is actually healthy (no more
     transient `502 Bad Gateway` on first boot).
-- [ ] Add a short section in this document explaining *why* health
+- [x] Add a short section in this document explaining *why* health
   checks + ordered readiness matter (not just "start order").
 
 ### Advanced (\*\*\*) — optional, targets a 10
 
-- [ ] Configure a `logging:` driver per service with size limits (e.g.
+- [x] Configure a `logging:` driver per service with size limits (e.g.
   `json-file` with `max-size: 10m`, `max-file: 3`) so logs cannot fill
   the disk.
-- [ ] Add resource limits (`deploy.resources.limits` for CPU and
+- [x] Add resource limits (`deploy.resources.limits` for CPU and
   memory) to each service and document the chosen values.
-- [ ] Custom networks beyond the single bridge (e.g. separate the
+- [x] Custom networks beyond the single bridge (e.g. separate the
   database into its own network only reachable by the backend).
+
 
 ### Housekeeping
 

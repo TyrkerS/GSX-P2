@@ -20,11 +20,18 @@ week8/
 
 ## 1. Contenidor Nginx (Frontend)
 
+**Ubicació:** `nginx/Dockerfile`
 
+Aquest contenidor s'encarrega de servir una pàgina web estàtica senzilla (`index.html`) per demostrar la presència del frontend web. 
 
+### Imatge Base i Dependències
+- **Imatge base:** `nginx:alpine`. Aquesta decisió respon als nivells Intermedi i Avançat de seguretat, escollint una imatge mínima un cop provada la robustesa de Linux Alpine, el que redueix enormement tant el cost d'emmagatzematge com la superfície d'atac.
 
-
-## 2. Contenidor de l'Aplicació Backend
+### Hardening de Seguretat i Optimitzacions (Avançat)
+- **Execució sense privilegis (Non-root):** Per defecte, Nginx s'executa com a `root` i escolta al port 80. Hem establert l'usuari `nginxuser` sense privilegis administratius de la següent manera:
+  - S'ha canviat el port d'escolta d'Nginx al directori `nginx.conf` perquè escolti el `8080` de manera interna.
+  - S'assigmen permisos d'escriptura a `/var/cache/nginx`, `/var/run` (i més exactament el `/tmp/nginx.pid` establert al `nginx.conf`) per aquest usuari no privilegiat.
+  - Mitjançant l'ordre `USER nginxuser`, arrenquem finalment el contenidor, complint els objectius avançats de prevenció de vulnerabilitats.## 2. Contenidor de l'Aplicació Backend
 
 **Ubicació:** `application/Dockerfile`
 
