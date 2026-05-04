@@ -14,7 +14,7 @@ provider "kubernetes" {
 # --- Nginx ---
 resource "kubernetes_service" "nginx" {
   metadata {
-    name = "nginx-${var.environment}"
+    name   = "nginx-${var.environment}"
     labels = {
       app         = "nginx"
       environment = var.environment
@@ -36,7 +36,7 @@ resource "kubernetes_service" "nginx" {
 
 resource "kubernetes_deployment" "nginx" {
   metadata {
-    name = "nginx-${var.environment}"
+    name   = "nginx-${var.environment}"
     labels = {
       app         = "nginx"
       environment = var.environment
