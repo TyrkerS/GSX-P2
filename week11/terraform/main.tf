@@ -11,6 +11,96 @@ provider "kubernetes" {
   config_path = "~/.kube/config"
 }
 
+# --- Nginx ---
+resource "kubernetes_service" "nginx" {
+  metadata {
+    name = "nginx-${var.environment}"
+    labels = {
+      app         = "nginx"
+      environment = var.environment
+    }
+  }
+  spec {
+    selector = {
+      app         = "nginx"
+      environment = var.environment
+    }
+    port {
+      port        = 80
+      target_port = 8080
+      node_port   = 30080
+    }
+    type = "NodePort"
+  }
+}
+
+resource "kubernetes_deployment" "nginx" {
+  metadata {
+    name = "nginx-${var.environment}"
+    labels = {
+      app         = "nginx"
+      environment = var.environment
+    }
+  }
+  spec {
+    replicas = var.nginx_replicas
+    selector {
+      match_labels = {
+        app         = "nginx"
+        environment = var.environment
+      }
+    }
+    template {
+      metadata {
+        labels = {
+          app         = "nginx"
+          environment = var.environment
+        }
+      }
+      spec {
+        container {
+          name              = "nginx"
+          image             = var.nginx_image
+          image_pull_policy = "IfNotPresent"
+
+          port {
+            container_port = 8080
+          }
+
+          resources {
+            requests = {
+              cpu    = "100m"
+              memory = "64Mi"
+            }
+            limits = {
+              cpu    = "250m"
+              memory = "128Mi"
+            }
+          }
+
+          liveness_probe {
+            http_get {
+              path = "/health"
+              port = 8080
+            }
+            initial_delay_seconds = 5
+            period_seconds        = 15
+          }
+
+          readiness_probe {
+            http_get {
+              path = "/health"
+              port = 8080
+            }
+            initial_delay_seconds = 5
+            period_seconds        = 15
+          }
+        }
+      }
+    }
+  }
+}
+
 # --- ConfigMap & Secret ---
 resource "kubernetes_config_map" "backend_config" {
   metadata {

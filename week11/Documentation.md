@@ -1,6 +1,6 @@
-# Week 11: Backend Infrastructure as Code & CI/CD
+# Week 11: Infrastructure as Code & CI/CD
 
-Esta documentación detalla la implementación de la Infraestructura como Código (IaC) para el componente **Backend y Base de Datos (PostgreSQL)** utilizando Terraform, así como la configuración del pipeline CI/CD en GitHub Actions.
+Esta documentación detalla la implementación de la Infraestructura como Código (IaC) para el stack completo (**Nginx, Backend y PostgreSQL**) utilizando Terraform, así como la configuración del pipeline CI/CD en GitHub Actions.
 
 ## 1. IaC: Elección de Herramienta y Arquitectura
 
@@ -10,13 +10,16 @@ Se ha elegido **Terraform** por su enfoque declarativo, que permite mantener un 
 ### Arquitectura en Terraform
 Los archivos de Terraform se encuentran en el directorio `terraform/` y están organizados de la siguiente forma:
 
-- **`main.tf`**: Contiene la definición de los recursos de Kubernetes:
+- **`main.tf`**: Contiene la definición de todos los recursos de Kubernetes:
+  - `kubernetes_deployment.nginx`: Orquesta los Pods del servidor Nginx (proxy/frontend).
+  - `kubernetes_service.nginx`: Expone Nginx al exterior mediante NodePort (puerto 30080).
   - `kubernetes_deployment.backend`: Orquesta los Pods del backend Node.js.
-  - `kubernetes_stateful_set.postgres`: Maneja la base de datos PostgreSQL, asegurando la identidad persistente de sus Pods y los volúmenes (PVC).
-  - `kubernetes_service`: Expone internamente el backend y la base de datos.
-  - `kubernetes_config_map` y `kubernetes_secret`: Proveen de configuración y secretos al backend y base de datos respectivamente, inyectándolos como variables de entorno.
-- **`variables.tf`**: Permite la flexibilidad de despliegue para diferentes entornos. Contiene variables como `environment` (dev/staging), `backend_replicas`, e imágenes a usar.
-- **`outputs.tf`**: Muestra información crítica una vez finalizado el despliegue (ej. los nombres de los servicios).
+  - `kubernetes_service.backend`: Expone internamente el backend (ClusterIP).
+  - `kubernetes_stateful_set.postgres`: Maneja la base de datos PostgreSQL con identidad persistente y PVC.
+  - `kubernetes_service.postgres`: Expone internamente PostgreSQL (ClusterIP).
+  - `kubernetes_config_map` y `kubernetes_secret`: Proveen configuración y secretos inyectados como variables de entorno.
+- **`variables.tf`**: Permite flexibilidad de despliegue. Variables clave: `environment` (dev/staging), `nginx_replicas`, `backend_replicas`, `nginx_image`, `backend_image`.
+- **`outputs.tf`**: Muestra los nombres de los servicios desplegados tras el apply.
 
 ## 2. Flujo de despliegue local (CD)
 El objetivo de Terraform es sustituir la aplicación manual de archivos YAML en Kubernetes.
@@ -55,3 +58,72 @@ La validación y empaquetamiento de las imágenes se hace de forma automática u
 
 ### Múltiples Entornos (Intermediate)
 Para cumplir con el reto intermedio, se configuraron variables (`var.environment`) en `variables.tf`. El uso de estas variables permite desplegar entornos de `dev` y `staging` de forma separada utilizando la misma base de código. Por ejemplo, en CI/CD se puede modificar para que la rama `staging` use `-var="environment=staging"`, diferenciando claramente los nombres de los servicios y Pods en Kubernetes.
+
+## 4. Flujo End-to-End: CI + CD local a Minikube
+
+Este es el flujo completo desde un cambio de código hasta el despliegue actualizado en Minikube.
+
+### Paso 1: Hacer un cambio y hacer push
+```bash
+# Ejemplo: modificar la aplicacion en week8/application
+git add .
+git commit -m "Update backend application"
+git push origin main
+```
+
+### Paso 2: CI corre automaticamente en GitHub Actions
+El pipeline (`.github/workflows/ci-backend.yml`) se dispara y ejecuta dos jobs en paralelo:
+
+1. **`build-and-push-backend`**: construye la imagen Docker del backend y la sube a Docker Hub con dos tags:
+   - `<DOCKER_USERNAME>/backend:main` (rama)
+   - `<DOCKER_USERNAME>/backend:sha-<commit-SHA>` (identificador unico del commit)
+
+2. **`validate-terraform`**: verifica que el codigo Terraform esta bien formateado y es valido sintacticamente.
+
+### Paso 3: Obtener el tag de la imagen generada por CI
+Una vez que el pipeline es verde, obtener el commit SHA del push:
+```bash
+git rev-parse --short HEAD
+# Ejemplo de salida: a1b2c3d
+```
+El tag de la imagen sera: `<DOCKER_USERNAME>/backend:sha-a1b2c3d`
+
+### Paso 4: Desplegar en Minikube con el nuevo tag
+```bash
+cd week11/terraform
+
+# Inicializar (solo la primera vez)
+terraform init
+
+# Desplegar con el nuevo tag de imagen producido por CI
+terraform apply \
+  -var="environment=dev" \
+  -var="backend_image=<DOCKER_USERNAME>/backend:sha-a1b2c3d"
+```
+
+### Paso 5: Verificar que el stack esta actualizado
+```bash
+# Ver que todos los pods estan corriendo
+kubectl get pods
+
+# Verificar la imagen que esta usando el pod del backend
+kubectl describe pod -l app=backend | grep Image
+
+# Ver los outputs de Terraform (nombres de servicios)
+terraform output
+
+# Acceder a Nginx desde fuera del cluster
+minikube service nginx-dev
+```
+
+### Resumen del flujo
+```
+git push
+    --> GitHub Actions (CI)
+            --> build imagen backend --> push a Docker Hub con SHA tag
+            --> terraform validate (sin tocar Minikube)
+    --> [CI verde]
+    --> terraform apply -var="backend_image=...:<SHA>" (local)
+            --> Kubernetes actualiza los Pods del backend con la nueva imagen
+            --> Nginx y PostgreSQL siguen corriendo sin interrupcion
+```

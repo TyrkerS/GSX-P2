@@ -33,3 +33,15 @@ variable "postgres_db" {
   type        = string
   default     = "greendevcorp"
 }
+
+variable "nginx_image" {
+  description = "Docker image for the Nginx service"
+  type        = string
+  default     = "greendevcorp/nginx:week9"
+}
+
+variable "nginx_replicas" {
+  description = "Number of Nginx replicas"
+  type        = number
+  default     = 2
+}

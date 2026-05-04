@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./week11/student1_backend/terraform
+        working-directory: ./week11/terraform
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
