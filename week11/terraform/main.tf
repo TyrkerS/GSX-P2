@@ -14,7 +14,7 @@ provider "kubernetes" {
 # --- Nginx ---
 resource "kubernetes_service" "nginx" {
   metadata {
-    name   = "nginx-${var.environment}"
+    name = "nginx-${var.environment}"
     labels = {
       app         = "nginx"
       environment = var.environment
@@ -36,7 +36,7 @@ resource "kubernetes_service" "nginx" {
 
 resource "kubernetes_deployment" "nginx" {
   metadata {
-    name   = "nginx-${var.environment}"
+    name = "nginx-${var.environment}"
     labels = {
       app         = "nginx"
       environment = var.environment
@@ -104,7 +104,7 @@ resource "kubernetes_deployment" "nginx" {
 # --- ConfigMap & Secret ---
 resource "kubernetes_config_map" "backend_config" {
   metadata {
-    name   = "backend-config-${var.environment}"
+    name = "backend-config-${var.environment}"
     labels = {
       app         = "backend"
       environment = var.environment
@@ -117,7 +117,7 @@ resource "kubernetes_config_map" "backend_config" {
 
 resource "kubernetes_secret" "postgres_secret" {
   metadata {
-    name   = "postgres-secret-${var.environment}"
+    name = "postgres-secret-${var.environment}"
     labels = {
       app         = "postgres"
       environment = var.environment
@@ -134,7 +134,7 @@ resource "kubernetes_secret" "postgres_secret" {
 # --- Services ---
 resource "kubernetes_service" "backend" {
   metadata {
-    name   = "backend-${var.environment}"
+    name = "backend-${var.environment}"
     labels = {
       app         = "backend"
       environment = var.environment
@@ -156,7 +156,7 @@ resource "kubernetes_service" "backend" {
 
 resource "kubernetes_service" "postgres" {
   metadata {
-    name   = "postgres-${var.environment}"
+    name = "postgres-${var.environment}"
     labels = {
       app         = "postgres"
       environment = var.environment
@@ -179,7 +179,7 @@ resource "kubernetes_service" "postgres" {
 # --- Deployment & StatefulSet ---
 resource "kubernetes_deployment" "backend" {
   metadata {
-    name   = "backend-${var.environment}"
+    name = "backend-${var.environment}"
     labels = {
       app         = "backend"
       environment = var.environment
@@ -285,7 +285,7 @@ resource "kubernetes_deployment" "backend" {
 
 resource "kubernetes_stateful_set" "postgres" {
   metadata {
-    name   = "postgres-${var.environment}"
+    name = "postgres-${var.environment}"
     labels = {
       app         = "postgres"
       environment = var.environment
