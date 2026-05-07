@@ -17,21 +17,21 @@ variable "backend_image" {
 }
 
 variable "postgres_user" {
-  description = "PostgreSQL User"
+  description = "PostgreSQL User. Required - provide via -var-file=<env>.tfvars (not committed)."
   type        = string
-  default     = "greendevcorp"
+  sensitive   = true
 }
 
 variable "postgres_password" {
-  description = "PostgreSQL Password"
+  description = "PostgreSQL Password. Required - provide via -var-file=<env>.tfvars (not committed)."
   type        = string
-  default     = "supersecret"
+  sensitive   = true
 }
 
 variable "postgres_db" {
-  description = "PostgreSQL Database"
+  description = "PostgreSQL Database name. Required - provide via -var-file=<env>.tfvars (not committed)."
   type        = string
-  default     = "greendevcorp"
+  sensitive   = true
 }
 
 variable "nginx_image" {

@@ -24,20 +24,36 @@ Los archivos de Terraform se encuentran en el directorio `terraform/` y están o
 ## 2. Flujo de despliegue local (CD)
 El objetivo de Terraform es sustituir la aplicación manual de archivos YAML en Kubernetes.
 
+### Manejo de secretos: tfvars files
+Las credenciales de PostgreSQL (`postgres_user`, `postgres_password`, `postgres_db`) **no tienen default** en `variables.tf` y son `sensitive = true`. Esto fuerza a que se proporcionen explícitamente en cada despliegue, evitando que valores reales acaben commiteados en el repo.
+
+Para gestionarlas se usa el patrón estándar de Terraform: archivos `.tfvars` específicos por entorno.
+
+- **`example.tfvars`**: plantilla commiteada con placeholders. Documenta qué variables hay que rellenar.
+- **`dev.tfvars`** (y futuros `staging.tfvars`, `prod.tfvars`): valores reales, **gitignorados** (regla `*.tfvars` en `.gitignore`, con excepción `!example.tfvars`).
+
+**Primer setup:**
+```powershell
+cd week11/terraform
+Copy-Item example.tfvars dev.tfvars
+# editar dev.tfvars y rellenar postgres_user, postgres_password, postgres_db
+```
+
 **Pasos para desplegar en local (Minikube):**
 1. Asegúrate de tener Minikube corriendo y Terraform instalado.
-2. Posiciónate en `terraform/`.
-3. Inicializa Terraform:
-   ```bash
+2. Posiciónate en `week11/terraform/`.
+3. Crea `dev.tfvars` desde la plantilla (solo la primera vez, ver arriba).
+4. Inicializa Terraform:
+   ```powershell
    terraform init
    ```
-4. Comprueba lo que se va a crear:
-   ```bash
-   terraform plan -var="environment=dev"
+5. Comprueba lo que se va a crear:
+   ```powershell
+   terraform plan -var-file=dev.tfvars
    ```
-5. Aplica los cambios:
-   ```bash
-   terraform apply -var="environment=dev"
+6. Aplica los cambios:
+   ```powershell
+   terraform apply -var-file=dev.tfvars
    ```
 
 ## 3. CI/CD: Pipeline con GitHub Actions
@@ -96,8 +112,9 @@ cd week11/terraform
 terraform init
 
 # Desplegar con el nuevo tag de imagen producido por CI
+# Las credenciales vienen de dev.tfvars (gitignorado), las imagenes se override por flag
 terraform apply \
-  -var="environment=dev" \
+  -var-file=dev.tfvars \
   -var="backend_image=<DOCKER_USERNAME>/backend:sha-a1b2c3d"
 ```
 

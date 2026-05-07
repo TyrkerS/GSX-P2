@@ -73,12 +73,20 @@ Write-Ok "kubeconfig in sync"
 # --- 4. Destroy + apply (full reproducibility test) ---
 Push-Location $tfDir
 try {
+    # Secrets (postgres credentials) live in dev.tfvars, which is gitignored.
+    # If the file is missing the user must copy example.tfvars to dev.tfvars
+    # and fill it in.
+    if (-not (Test-Path "dev.tfvars")) {
+        Write-Err "dev.tfvars not found. Copy example.tfvars to dev.tfvars and fill in the postgres_* values."
+        exit 1
+    }
+
     terraform init -input=false
     if ($LASTEXITCODE -ne 0) { throw "terraform init (with backend) failed" }
 
     if (-not $SkipDestroy) {
         Write-Step "4a. Destroying existing infrastructure"
-        terraform destroy -auto-approve -var="environment=dev"
+        terraform destroy -auto-approve -var-file="dev.tfvars"
         if ($LASTEXITCODE -ne 0) {
             throw "terraform destroy failed (exit $LASTEXITCODE) - state may be inconsistent. Run a manual cleanup before retrying."
         }
@@ -87,7 +95,7 @@ try {
 
     Write-Step "4b. Applying Terraform from scratch"
     $start = Get-Date
-    terraform apply -auto-approve -var="environment=dev"
+    terraform apply -auto-approve -var-file="dev.tfvars"
     if ($LASTEXITCODE -ne 0) { throw "terraform apply failed" }
     $duration = (Get-Date) - $start
     Write-Ok ("apply completed in {0:N0}s" -f $duration.TotalSeconds)
