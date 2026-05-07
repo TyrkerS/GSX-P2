@@ -121,9 +121,51 @@ minikube service nginx-dev
 git push
     --> GitHub Actions (CI)
             --> build imagen backend --> push a Docker Hub con SHA tag
+            --> build imagen nginx   --> push a Docker Hub con SHA tag
             --> terraform validate (sin tocar Minikube)
     --> [CI verde]
-    --> terraform apply -var="backend_image=...:<SHA>" (local)
-            --> Kubernetes actualiza los Pods del backend con la nueva imagen
-            --> Nginx y PostgreSQL siguen corriendo sin interrupcion
+    --> terraform apply -var="backend_image=...:<SHA>" -var="nginx_image=...:<SHA>" (local)
+            --> Kubernetes actualiza los Pods con las nuevas imagenes
+            --> PostgreSQL sigue corriendo sin interrupcion
 ```
+
+## 5. Verificacion End-to-End
+
+Para demostrar que la IaC es realmente reproducible (requisito explicito del PDF), se incluye el script `verify-e2e.ps1` que ejecuta el test completo: destruir todo lo desplegado, volver a aplicar Terraform desde cero y verificar que el stack arranca correctamente.
+
+### Ejecutar la verificacion
+```powershell
+cd week11
+.\verify-e2e.ps1
+```
+
+### Que hace el script
+1. Comprueba que `terraform`, `kubectl` y `minikube` estan en el PATH.
+2. Valida el codigo Terraform (`fmt -check`, `init`, `validate`) — los mismos checks que corre el CI.
+3. Asegura que Minikube esta corriendo (lo arranca si no lo esta).
+4. Ejecuta `terraform destroy` para borrar cualquier despliegue previo.
+5. Ejecuta `terraform apply` desde cero y mide el tiempo total.
+6. Espera con `kubectl wait` a que todos los pods esten `Ready` (timeout 180s).
+7. Lista pods y servicios para evidencia.
+8. Hace un smoke test HTTP contra el NodePort de Nginx (`http://<minikube-ip>:30080`).
+
+Si todos los pasos pasan, imprime `End-to-End verification SUCCESS`.
+
+### Saltar el destroy
+Si solo quieres validar y aplicar sin borrar el estado actual:
+```powershell
+.\verify-e2e.ps1 -SkipDestroy
+```
+
+### Salida esperada
+- `terraform fmt/init/validate` → OK
+- `terraform apply` → ~30-60s la primera vez (depende de la descarga de imagenes)
+- `kubectl get pods` → 2 pods Nginx + 2 pods backend + 1 pod postgres, todos `Running`
+- Smoke test HTTP via `kubectl port-forward` → HTTP 200 de Nginx
+
+### Acceso a Nginx desde el host (Windows + Minikube driver Docker)
+En Linux `curl http://$(minikube ip):30080` funciona directamente. En Windows con el driver Docker la IP que devuelve `minikube ip` (`192.168.49.2`) vive dentro de la red interna de Docker Desktop y NO es alcanzable desde PowerShell. Por eso el script de verificacion usa `kubectl port-forward`, que funciona en todas las plataformas. Para acceso interactivo desde el navegador la forma mas comoda es:
+```powershell
+minikube service nginx-dev
+```
+que abre un tunel y lanza el navegador en la URL correcta.

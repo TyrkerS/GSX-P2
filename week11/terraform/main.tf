@@ -12,6 +12,51 @@ provider "kubernetes" {
 }
 
 # --- Nginx ---
+# Inject the nginx.conf via ConfigMap so the upstream hostname can follow the
+# environment suffix (`backend-${var.environment}`). This decouples the running
+# config from whatever was baked into the container image.
+resource "kubernetes_config_map" "nginx_config" {
+  metadata {
+    name = "nginx-config-${var.environment}"
+    labels = {
+      app         = "nginx"
+      environment = var.environment
+    }
+  }
+  data = {
+    "nginx.conf" = <<-EOT
+      worker_processes auto;
+      pid /tmp/nginx.pid;
+
+      events {
+          worker_connections 1024;
+      }
+
+      http {
+          server {
+              listen 8080;
+
+              location / {
+                  root /usr/share/nginx/html;
+                  index index.html;
+              }
+
+              location /health {
+                  return 200 'healthy';
+                  add_header Content-Type text/plain;
+              }
+
+              location /api/ {
+                  proxy_pass http://backend-${var.environment}:3000/;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+              }
+          }
+      }
+    EOT
+  }
+}
+
 resource "kubernetes_service" "nginx" {
   metadata {
     name = "nginx-${var.environment}"
@@ -67,6 +112,13 @@ resource "kubernetes_deployment" "nginx" {
             container_port = 8080
           }
 
+          volume_mount {
+            name       = "nginx-config"
+            mount_path = "/etc/nginx/nginx.conf"
+            sub_path   = "nginx.conf"
+            read_only  = true
+          }
+
           resources {
             requests = {
               cpu    = "100m"
@@ -94,6 +146,13 @@ resource "kubernetes_deployment" "nginx" {
             }
             initial_delay_seconds = 5
             period_seconds        = 15
+          }
+        }
+
+        volume {
+          name = "nginx-config"
+          config_map {
+            name = kubernetes_config_map.nginx_config.metadata[0].name
           }
         }
       }
