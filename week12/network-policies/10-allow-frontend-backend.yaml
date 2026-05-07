@@ -1,0 +1,38 @@
+# Permitir trafico de Nginx (frontend) hacia el backend dentro del MISMO entorno.
+#
+# Owner: Persona A - TODO
+#
+# Reglas que esta policy debe codificar:
+#   - Solo pods con label app=nginx pueden conectarse al backend
+#   - Solo dentro del mismo entorno (matching environment label)
+#   - Solo al puerto 3000/TCP del backend
+#
+# Pista: usa matchLabels con `app` y `environment` para evitar que
+# nginx-dev pueda hablar con backend-staging o backend-prod.
+#
+# Verificacion:
+#   kubectl exec -it <nginx-dev-pod> -- wget -qO- http://backend-dev:3000/health   # debe pasar
+#   kubectl exec -it <nginx-dev-pod> -- wget -qO- http://backend-staging:3000/...  # debe fallar
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-nginx-to-backend-dev
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+      environment: dev
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: nginx
+              environment: dev
+      ports:
+        - protocol: TCP
+          port: 3000
+# TODO Persona A: duplicar para staging y prod con sus respectivos labels.

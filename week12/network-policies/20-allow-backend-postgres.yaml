@@ -1,0 +1,35 @@
+# Permitir trafico del backend hacia su PostgreSQL dentro del mismo entorno.
+#
+# Owner: Persona A - TODO
+#
+# Reglas que esta policy debe codificar:
+#   - Solo pods con app=backend y environment=X pueden conectar a postgres-X
+#   - Solo al puerto 5432/TCP
+#   - Nada mas (ni Nginx, ni partners, ni otros entornos pueden tocar la DB)
+#
+# Verificacion:
+#   kubectl exec -it <backend-dev-pod> -- nc -zv postgres-dev 5432   # debe pasar
+#   kubectl exec -it <nginx-dev-pod>   -- nc -zv postgres-dev 5432   # debe fallar
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backend-to-postgres-dev
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+      environment: dev
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: backend
+              environment: dev
+      ports:
+        - protocol: TCP
+          port: 5432
+# TODO Persona A: duplicar para staging y prod con sus respectivos labels.

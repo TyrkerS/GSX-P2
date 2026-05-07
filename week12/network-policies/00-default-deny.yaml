@@ -1,0 +1,26 @@
+# Default-deny: punto de partida zero-trust.
+#
+# Niega TODO trafico de entrada y salida en el namespace por defecto.
+# Despues, las demas policies anaden permisos especificos para los flujos
+# que SI deben funcionar.
+#
+# IMPORTANTE: Minikube por defecto usa kindnet, que NO aplica NetworkPolicies.
+# Para que esto tenga efecto el cluster debe arrancarse con un CNI que las
+# soporte, p.ej. Calico:
+#   minikube delete
+#   minikube start --cni=calico
+#
+# Verificacion (debe fallar despues de aplicar):
+#   kubectl run tester --rm -it --image=busybox -- wget -qO- http://nginx-dev:80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: default
+spec:
+  # Selector vacio = aplica a TODOS los pods del namespace
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress

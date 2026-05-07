@@ -1,0 +1,27 @@
+# Defensa explicita: prohibir cualquier comunicacion entre entornos distintos.
+#
+# Owner: Persona A - TODO
+#
+# Estrategia:
+#   Con default-deny + las policies anteriores (10/20) seleccionando por
+#   environment, en teoria el trafico cross-env ya esta bloqueado.
+#   Esta policy es defensa en profundidad: aunque alguien anada un policy
+#   permisivo por error, esta sigue cortando.
+#
+# Pista: NetworkPolicies no tienen "deny" explicito (todo es allow + default-deny),
+# pero puedes conseguirlo con egress que excluya rangos. Otra opcion comun
+# es aislar cada entorno en su propio namespace y usar matchExpressions.
+#
+# Decision recomendada:
+#   - O bien convertir cada entorno (dev/staging/prod) en un namespace
+#     separado y aplicar default-deny + allowlist por namespace.
+#   - O bien mantener todo en `default` y confiar en los selectors por
+#     environment label (mas fragil pero mas simple para Minikube).
+#
+# Documenta en Documentation.md la opcion elegida y por que.
+---
+# TODO Persona A: implementar segun decision tomada.
+# Si optas por namespaces separados, este fichero puede desaparecer
+# (las policies 10/20 viven dentro de cada namespace).
+# Si optas por single-namespace + selectors, anadir aqui un policy de
+# egress que prohiba dirigirse a pods con environment != el propio.
