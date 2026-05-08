@@ -1,0 +1,38 @@
+# Permitir egress a kube-dns desde TODOS los pods del namespace default.
+#
+# Por que esta policy es obligatoria:
+#   default-deny corta toda salida (egress). Eso incluye las consultas DNS
+#   que los pods hacen a coredns para resolver nombres como "backend-dev".
+#   Sin esta excepcion, las allow-rules de aplicacion (10, 20) tampoco
+#   funcionan, porque el pod nunca llega a resolver el hostname del destino.
+#
+# Lo que abre exactamente:
+#   - podSelector: {}  -> aplica a todos los pods de `default`
+#   - permite egress unicamente al pod kube-dns del namespace kube-system
+#   - solo en el puerto 53 (UDP estandar, TCP para respuestas grandes)
+#
+# Esta es la excepcion MINIMA al default-deny. Cualquier otro trafico de
+# salida sigue prohibido hasta que una policy especifica lo permita.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: default
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

@@ -1,27 +1,33 @@
-# Defensa explicita: prohibir cualquier comunicacion entre entornos distintos.
+# Aislamiento entre entornos (dev / staging / prod).
 #
-# Owner: Persona A - TODO
+# Decision tomada: SINGLE-NAMESPACE + SELECTORS POR LABEL.
 #
-# Estrategia:
-#   Con default-deny + las policies anteriores (10/20) seleccionando por
-#   environment, en teoria el trafico cross-env ya esta bloqueado.
-#   Esta policy es defensa en profundidad: aunque alguien anada un policy
-#   permisivo por error, esta sigue cortando.
+# NetworkPolicies en Kubernetes son aditivas y NO admiten "deny" explicito:
+# todo es default-deny + allowlist. Por tanto el aislamiento cross-env se
+# consigue por construccion en las policies 10/11/12 (frontend->backend) y
+# 20/21/22 (backend->postgres):
 #
-# Pista: NetworkPolicies no tienen "deny" explicito (todo es allow + default-deny),
-# pero puedes conseguirlo con egress que excluya rangos. Otra opcion comun
-# es aislar cada entorno en su propio namespace y usar matchExpressions.
+#   - Cada policy abre UN flujo concreto: nginx-X -> backend-X (mismo env).
+#   - No hay ninguna policy que abra nginx-X -> backend-Y donde X != Y.
+#   - Bajo default-deny, "no abierto" = bloqueado.
 #
-# Decision recomendada:
-#   - O bien convertir cada entorno (dev/staging/prod) en un namespace
-#     separado y aplicar default-deny + allowlist por namespace.
-#   - O bien mantener todo en `default` y confiar en los selectors por
-#     environment label (mas fragil pero mas simple para Minikube).
+# Resultado: trafico cross-env queda bloqueado sin escribir un policy
+# adicional. Esta es la barrera de aislamiento.
 #
-# Documenta en Documentation.md la opcion elegida y por que.
----
-# TODO Persona A: implementar segun decision tomada.
-# Si optas por namespaces separados, este fichero puede desaparecer
-# (las policies 10/20 viven dentro de cada namespace).
-# Si optas por single-namespace + selectors, anadir aqui un policy de
-# egress que prohiba dirigirse a pods con environment != el propio.
+# Por que NO usamos namespaces separados (la otra opcion del enunciado):
+#   - Anade complejidad operacional (RoleBindings, NetworkPolicies por NS,
+#     services con FQDN cross-namespace) que no aporta nada nuevo en la
+#     demo de Minikube.
+#   - El selector por label `environment` es suficiente para demostrar el
+#     concepto y mas facil de auditar en un cluster pequeno.
+#   - En produccion real con multiples equipos sí migrariamos a un NS por
+#     entorno + RBAC, pero esa decision queda fuera del alcance de la P2.
+#
+# Defensa en profundidad disponible si lo quisieramos endurecer:
+#   - Anadir admission controller (OPA / Kyverno) que prohiba crear pods
+#     sin la label `environment`.
+#   - Etiquetar nodos por entorno y usar nodeAffinity + taints para que
+#     los pods de un entorno no compartan nodo con otros.
+#
+# Conclusion: este fichero NO contiene NetworkPolicies. La regla de
+# cross-env-deny vive en las policies 10-22 por construccion.

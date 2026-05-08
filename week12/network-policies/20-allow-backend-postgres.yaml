@@ -1,20 +1,20 @@
-# Permitir trafico del backend hacia su PostgreSQL dentro del mismo entorno.
+# Permitir trafico backend -> postgres dentro del MISMO entorno.
 #
-# Owner: Persona A - TODO
+# Misma logica que la policy 10: dos NetworkPolicies por flujo, una de
+# ingress en el destino (postgres) y otra de egress en el origen (backend).
 #
-# Reglas que esta policy debe codificar:
-#   - Solo pods con app=backend y environment=X pueden conectar a postgres-X
-#   - Solo al puerto 5432/TCP
-#   - Nada mas (ni Nginx, ni partners, ni otros entornos pueden tocar la DB)
+# Solo dev esta desplegado actualmente. Las plantillas staging/prod estan
+# en `templates-staging-prod.yaml`.
 #
 # Verificacion:
-#   kubectl exec -it <backend-dev-pod> -- nc -zv postgres-dev 5432   # debe pasar
-#   kubectl exec -it <nginx-dev-pod>   -- nc -zv postgres-dev 5432   # debe fallar
+#   kubectl exec <backend-pod> -- nc -zv postgres 5432   # open
+#   kubectl exec <nginx-pod>   -- nc -zv postgres 5432   # debe fallar
 ---
+# 20a - Ingress: postgres-dev acepta conexiones desde backend-dev en TCP 5432
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-backend-to-postgres-dev
+  name: allow-backend-to-postgres-dev-ingress
   namespace: default
 spec:
   podSelector:
@@ -32,4 +32,27 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
-# TODO Persona A: duplicar para staging y prod con sus respectivos labels.
+---
+# 20b - Egress: backend-dev puede iniciar conexiones a postgres-dev en TCP 5432
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backend-to-postgres-dev-egress
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+      environment: dev
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+              environment: dev
+      ports:
+        - protocol: TCP
+          port: 5432
+# Las versiones staging y prod estan en `templates-staging-prod.yaml`.

@@ -1,0 +1,196 @@
+# Plantillas de NetworkPolicies para staging y prod.
+#
+# Estos manifests son YAML validos pero no afectaran trafico hasta que
+# existan deployments con los labels correspondientes (app=X,
+# environment=staging|prod). Los incluimos para demostrar que el patron
+# escala a cualquier numero de entornos sin cambiar la estrategia.
+#
+# Aplicarlos no rompe nada: si los pods staging/prod no existen, las
+# policies simplemente no matchean. Cuando se anaden los deployments,
+# pasan a aplicarse automaticamente.
+---
+# === STAGING ===
+# 11a - Ingress: backend-staging acepta de nginx-staging
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-nginx-to-backend-staging-ingress
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+      environment: staging
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: nginx
+              environment: staging
+      ports:
+        - protocol: TCP
+          port: 3000
+---
+# 11b - Egress: nginx-staging puede iniciar a backend-staging
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-nginx-to-backend-staging-egress
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: nginx
+      environment: staging
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: backend
+              environment: staging
+      ports:
+        - protocol: TCP
+          port: 3000
+---
+# 21a - Ingress: postgres-staging acepta de backend-staging
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backend-to-postgres-staging-ingress
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+      environment: staging
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: backend
+              environment: staging
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+# 21b - Egress: backend-staging puede iniciar a postgres-staging
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backend-to-postgres-staging-egress
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+      environment: staging
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+              environment: staging
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+# === PROD ===
+# 12a - Ingress: backend-prod acepta de nginx-prod
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-nginx-to-backend-prod-ingress
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+      environment: prod
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: nginx
+              environment: prod
+      ports:
+        - protocol: TCP
+          port: 3000
+---
+# 12b - Egress: nginx-prod puede iniciar a backend-prod
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-nginx-to-backend-prod-egress
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: nginx
+      environment: prod
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: backend
+              environment: prod
+      ports:
+        - protocol: TCP
+          port: 3000
+---
+# 22a - Ingress: postgres-prod acepta de backend-prod
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backend-to-postgres-prod-ingress
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+      environment: prod
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: backend
+              environment: prod
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+# 22b - Egress: backend-prod puede iniciar a postgres-prod
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backend-to-postgres-prod-egress
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+      environment: prod
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+              environment: prod
+      ports:
+        - protocol: TCP
+          port: 5432
