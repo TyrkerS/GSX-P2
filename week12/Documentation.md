@@ -1,6 +1,6 @@
 # Week 12: Network Design & Identity
 
-> **Estado:** Persona A completada. Persona B pendiente (secciones 4 y 5).
+> **Estado:** Completada (Persona A y Persona B).
 >
 > Persona A: implementacion (red + NetworkPolicies). Persona B: investigacion (servicios core + identidad).
 
@@ -102,15 +102,21 @@ kubectl get pods -n kube-system | Select-String calico
 
 ## 4. Servicios core (DNS / DHCP / NTP)
 
-> TODO Persona B: integrar resumen aqui.
+Los servicios core (DNS, DHCP, NTP) son los cimientos invisibles que permiten a la red operar de manera coherente y segura:
+- **DNS** permite la resolución de nombres estables en un entorno efímero como Kubernetes.
+- **DHCP** automatiza la asignación de IPs, resolviendo el problema de escalar la conectividad en oficinas e infraestructura base.
+- **NTP** asegura sincronización de submilisegundos en toda la red, lo cual es vital para correlacionar eventos forenses, mantener la validez de certificados TLS y la autenticación basada en tokens temporales.
 
-Ver `research/core-services.md`.
+Ver la explicación extendida en `research/core-services.md`.
 
 ## 5. Identity Management
 
-> TODO Persona B: integrar resumen + recomendacion final aqui.
+Para la escala y proyección de GreenDevCorp (múltiples oficinas, equipos, y entornos), la estrategia de identidad debe abandonar por completo las soluciones desconectadas como credenciales locales compartidas.
 
-Ver `research/identity.md`.
+**Recomendación principal:**
+Adoptar un **Proveedor de Identidad (IdP) gestionado en la nube** (como Google Workspace, Microsoft Entra ID u Okta) y establecer **Single Sign-On (SSO)** para todas las herramientas corporativas mediante OIDC/SAML. Esto centraliza la autenticación (Authn), facilita la imposición de MFA y simplifica drásticamente los procesos de alta y baja de empleados, limitando el acceso a lo estrictamente necesario (Authz mediante RBAC). 
+
+Ver el análisis completo de estrategias, trade-offs y roadmap en `research/identity.md`.
 
 ## 6. Analisis de seguridad
 
@@ -156,7 +162,8 @@ Ver `research/identity.md`.
 
 ## 7. Lo que el equipo ha aprendido
 
-> TODO conjunto al cerrar la semana:
-> - Decisiones clave y trade-offs
-> - Limitaciones del setup actual
-> - Que se haria distinto si tuvieramos mas tiempo
+Esta semana consolidó la visión de cómo una red corporativa moderna opera más allá de la simple conectividad L3. Hemos aprendido que la seguridad no es un producto que se añade al final, sino un diseño fundamental.
+
+- **Decisiones clave y trade-offs:** La decisión de usar *default-deny* en NetworkPolicies implicó mucho más esfuerzo de depuración inicial, pero es el único camino defendible hacia un modelo Zero Trust. Por otro lado, la recomendación de usar un IdP en la nube significa aceptar *vendor lock-in* para librar al equipo del mantenimiento operativo de los servidores de identidad.
+- **Limitaciones del setup actual:** Seguimos dependiendo de un único Nginx que actúa como punto único de fallo (SPOF). Además, nuestras políticas de red aíslan flujos de red a nivel de puerto, pero no inspeccionan el tráfico L7 (no previenen inyecciones SQL que viajen dentro de las conexiones autorizadas al puerto 5432).
+- **Qué se haría distinto con más tiempo:** Implementaríamos una VPN real (ej. WireGuard) para interconectar de manera cifrada el tráfico de las simuladas oficinas. A nivel de clúster, instalaríamos OpenLDAP o Dex integrado con Minikube para hacer una prueba práctica de inicio de sesión de desarrolladores usando credenciales centralizadas contra el API server.
