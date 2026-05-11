@@ -1,8 +1,6 @@
 # Week 12: Network Design & Identity
 
-> **Estado:** Completada (Persona A y Persona B).
->
-> Persona A: implementacion (red + NetworkPolicies). Persona B: investigacion (servicios core + identidad).
+> **Estat:** Completada.
 
 ## 1. Arquitectura de red
 
@@ -153,9 +151,8 @@ Ver el análisis completo de estrategias, trade-offs y roadmap en `research/iden
   estos labels.
 - **CNI con soporte real.** Verificado que Minikube corre con Calico (no
   kindnet). En el cluster real seria una check de provisioning.
-- **Revisiones de pares.** Todo cambio en `network-policies/` se revisa
-  por la otra persona del equipo antes de mergear, como cualquier otro
-  codigo.
+- **Revisió per l'equip.** Tot canvi a `network-policies/` es revisa
+  per l'equip abans de mergejar, com qualsevol altre codi.
 - **Tests automatizables.** `verify-week12.ps1` ejecuta los cinco
   escenarios; la idea es portarlo a CI cuando tengamos un cluster
   efimero por PR.

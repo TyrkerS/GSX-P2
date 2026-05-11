@@ -7,11 +7,17 @@ on:
     branches: [ "main" ]
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Construir imatge backend, pujar a Docker Hub, cache de capes per velocitat
+  # ---------------------------------------------------------------------------
   build-and-push-backend:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -32,12 +38,20 @@ jobs:
           push: true
           tags: ${{ steps.meta-backend.outputs.tags }}
           labels: ${{ steps.meta-backend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
+  # ---------------------------------------------------------------------------
+  # Construir imatge nginx, pujar a Docker Hub, cache de capes per velocitat
+  # ---------------------------------------------------------------------------
   build-and-push-nginx:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -58,7 +72,44 @@ jobs:
           push: true
           tags: ${{ steps.meta-nginx.outputs.tags }}
           labels: ${{ steps.meta-nginx.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
+  # ---------------------------------------------------------------------------
+  # Escaneig de seguretat: Trivy escaneja les dues imatges per CVEs
+  # Falla el build si es troba qualsevol vulnerabilitat CRITICAL o HIGH
+  # ---------------------------------------------------------------------------
+  security-scan-backend:
+    runs-on: ubuntu-latest
+    needs: build-and-push-backend
+    steps:
+      - name: Run Trivy vulnerability scanner on backend
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ secrets.DOCKER_USERNAME }}/backend:main'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+  security-scan-nginx:
+    runs-on: ubuntu-latest
+    needs: build-and-push-nginx
+    steps:
+      - name: Run Trivy vulnerability scanner on nginx
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ secrets.DOCKER_USERNAME }}/nginx:main'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+  # ---------------------------------------------------------------------------
+  # Validació IaC: format, init, validate Terraform sense tocar Minikube
+  # ---------------------------------------------------------------------------
   validate-terraform:
     runs-on: ubuntu-latest
     defaults:

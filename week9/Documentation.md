@@ -1,13 +1,13 @@
-# Week 9 — Multi-Container Orchestration (Docker Compose)
+# Setmana 9 — Orquestració multi-contenidor (Docker Compose)
 
-## Overview
+## Visió general
 
-This week we move from single containers (Week 8) to a coordinated
-multi-container stack defined in a single `docker-compose.yml` file.
-The stack contains three services that communicate over a private Docker
-network and use a named volume for data persistence.
+Aquesta setmana passem d'un sol contenidor (Setmana 8) a un conjunt
+multi-contenidor coordinat definit en un únic fitxer `docker-compose.yml`.
+El conjunt conté tres serveis que es comuniquen a través d'una xarxa Docker
+privada i fan servir un volum amb nom per a la persistència de dades.
 
-## Architecture Diagram
+## Diagrama d'arquitectura
 
 ```
                           Host (localhost)
@@ -16,234 +16,234 @@ network and use a named volume for data persistence.
                                  ▼
               ┌──────────────────────────────────────┐
               │   nginx  (greendevcorp/nginx:week9)  │
-              │   - serves static index.html at /    │
-              │   - /health returns "healthy"        │
-              │   - /api/ → reverse proxy to backend │
+              │   - serveix index.html estàtic a /   │
+              │   - /health retorna "healthy"        │
+              │   - /api/ → reverse proxy al backend │
               └────────────┬─────────────────────────┘
                            │  [frontend-net] http://backend:3000
                            ▼
               ┌──────────────────────────────────────┐
-              │   backend  (Node.js HTTP server)     │
-              │   - responds with JSON               │
-              │   - /health endpoint                 │
+              │   backend  (servidor HTTP Node.js)   │
+              │   - respon amb JSON                  │
+              │   - endpoint /health                 │
               └────────────┬─────────────────────────┘
                            │  [backend-net] postgres://postgres:5432
                            ▼
               ┌──────────────────────────────────────┐
-              │   postgres  (official image)         │
-              │   - persistent data in named volume  │
+              │   postgres  (imatge oficial)         │
+              │   - dades persistents en volum       │
               │     postgres_data → /var/lib/...     │
               └──────────────────────────────────────┘
 
-          Service discovery is scoped by tier mapping. 
+          El descobriment de serveis s'aconsegueix per nivells de xarxa.
 ```
 
-## Services
+## Serveis
 
-### 1. nginx (Persona A)
+### 1. nginx
 
-- **Image:** built from `./nginx/Dockerfile` (base `nginx:latest`)
-- **Role:** front door of the stack. Serves a static landing page and
-  acts as a reverse proxy for the backend.
-- **Port mapping:** `${NGINX_PORT:-80}:80` (host:container)
-- **Routes:**
-  - `GET /` → static `index.html`
-  - `GET /health` → literal `healthy` (used for smoke tests)
-  - `GET /api/...` → `proxy_pass` to `http://backend:3000/`
-- **Why a reverse proxy?** It hides the backend from the host network
-  (the backend port is NOT published), centralizes TLS/logging in a
-  single entry point, and demonstrates inter-service DNS resolution
-  (`backend` as a hostname is resolved by Docker's embedded DNS).
+- **Imatge:** construïda des de `./nginx/Dockerfile` (base `nginx:latest`)
+- **Rol:** porta d'entrada del conjunt. Serveix una pàgina estàtica i
+  actua com a reverse proxy per al backend.
+- **Mapatge de ports:** `${NGINX_PORT:-80}:80` (host:contenidor)
+- **Rutes:**
+  - `GET /` → `index.html` estàtic
+  - `GET /health` → literal `healthy` (s'utilitza per a smoke tests)
+  - `GET /api/...` → `proxy_pass` cap a `http://backend:3000/`
+- **Per què un reverse proxy?** Amaga el backend de la xarxa del host
+  (el port del backend NO es publica), centralitza TLS/logging en un
+  únic punt d'entrada i demostra la resolució DNS entre serveis
+  (`backend` com a hostname es resol pel DNS integrat de Docker).
 
-### 2. backend (Persona B)
+### 2. backend
 
-- **Image:** built from `./application/Dockerfile` (multistage, non-root
-  user, base `node:20-alpine`).
-- **Role:** simple Node.js HTTP server that responds with JSON. It is
-  the target of the `/api/` reverse proxy in nginx.
-- **Port mapping:** none. The service listens on `3000` only inside the
-  Docker network, so it is **not reachable from the host directly** —
-  all external traffic has to go through nginx. This is intentional:
-  it demonstrates the "services should not expose ports they don't
-  need" principle.
-- **Env vars:** `PORT` (read by `app.js` via `process.env.PORT`,
-  defaulting to `3000`).
-- **`depends_on: postgres`:** ensures the database container is
-  started before the backend. Note: with the core `depends_on` this
-  only guarantees start order, not that postgres is *ready* to accept
-  connections. The intermediate tier adds a proper `healthcheck` +
-  `condition: service_healthy` for that.
+- **Imatge:** construïda des de `./application/Dockerfile` (multistage, usuari
+  no root, base `node:20-alpine`).
+- **Rol:** servidor HTTP simple de Node.js que respon amb JSON. És
+  l'objectiu del reverse proxy `/api/` de nginx.
+- **Mapatge de ports:** cap. El servei escolta al port `3000` només dins de la
+  xarxa Docker, per tant **no és accessible des del host directament** —
+  tot el tràfic extern ha de passar per nginx. Això és intencionat:
+  il·lustra el principi "els serveis no han d'exposar ports que no
+  necessiten".
+- **Variables d'entorn:** `PORT` (llegida per `app.js` via `process.env.PORT`,
+  per defecte `3000`).
+- **`depends_on: postgres`:** assegura que el contenidor de base de dades
+  s'inicia abans que el backend. Nota: amb el `depends_on` bàsic, això
+  només garanteix l'ordre d'arrencada, no que postgres estigui *llest*
+  per acceptar connexions. La forma avançada afegeix un `healthcheck`
+  adequat + `condition: service_healthy` per a això.
 
-### 3. postgres (Persona B)
+### 3. postgres
 
-- **Image:** `postgres:16-alpine` (official image, small footprint).
-- **Role:** relational database. Included to demonstrate a stateful
-  service coexisting with the stateless ones and to justify the use of
-  a named volume for persistence.
-- **Port mapping:** none. Only reachable from other containers on
-  `greendevcorp-net` at `postgres:5432`.
-- **Env vars (required by the official image):**
-  - `POSTGRES_USER` — admin user created on first boot.
-  - `POSTGRES_PASSWORD` — admin password.
-  - `POSTGRES_DB` — initial database created on first boot.
-- **Named volume:** `postgres_data` mounted at
-  `/var/lib/postgresql/data`. All database files live there, so the
-  data survives `docker-compose down` and container recreation.
+- **Imatge:** `postgres:16-alpine` (imatge oficial, petita empremta).
+- **Rol:** base de dades relacional. Inclosa per demostrar un servei
+  amb estat coexistint amb els sense estat i per justificar l'ús d'un
+  volum amb nom per a la persistència.
+- **Mapatge de ports:** cap. Només accessible des d'altres contenidors a
+  `postgres:5432`.
+- **Variables d'entorn (requerides per la imatge oficial):**
+  - `POSTGRES_USER` — usuari administrador creat al primer arrencament.
+  - `POSTGRES_PASSWORD` — contrasenya d'administrador.
+  - `POSTGRES_DB` — base de dades inicial creada al primer arrencament.
+- **Volum amb nom:** `postgres_data` muntat a
+  `/var/lib/postgresql/data`. Tots els fitxers de la base de dades hi
+  viuen, de manera que les dades sobreviuen a `docker-compose down` i
+  la recreació de contenidors.
 
-## Networking
+## Xarxa
 
-We employ **Custom Networks (Tier ***)** moving away from a single default bridge to precise isolation.
+Fem servir **xarxes personalitzades (Tier ***)** allunyant-nos d'un únic
+pont predeterminat per a un aïllament precís.
 
-- **`frontend-net`**: Shared only between `nginx` and `backend`. Nginx connects natively via `http://backend:3000`.
-- **`backend-net`**: Shared only between `backend` and `postgres`.
-- **Isolation guarantees**: The Nginx frontend has no route mapped to the database. Even if the frontend proxy is compromised, attackers cannot directly ping Postgres.
+- **`frontend-net`**: Compartida només entre `nginx` i `backend`. Nginx es
+  connecta de forma nativa via `http://backend:3000`.
+- **`backend-net`**: Compartida només entre `backend` i `postgres`.
+- **Garanties d'aïllament**: El frontend Nginx no té cap ruta mapeada a la
+  base de dades. Fins i tot si el proxy frontend es veu compromès, els
+  atacants no poden accedir directament a Postgres.
 
-## Production Constraints (Advanced & Intermediate)
+## Restriccions de producció (Avançat i Intermedi)
 
-The updated architecture incorporates features for resilient, robust deployments mapping to higher tiers:
+L'arquitectura actualitzada incorpora funcionalitats per a desplegaments
+resilients i robustos corresponents a nivells superiors:
 
-- **Healthchecks**: Services have built-in probes (e.g. `pg_isready`, `curl`, `wget`) constantly checking availability. 
-- **Ordered Readiness**: Rather than mere start order, we use `condition: service_healthy` across Compose. For instance, `backend` will completely halt startup until Postgres emits ready status, eliminating race conditions.
-- **Resource Constraints (`deploy.resources.limits`)**: Crucial for multi-tenant scalability, we restrict compute capabilities (CPU fractions & RAM quota) per node.
-- **Log constraints (`logging`)**: We cap local logs at `json-file: 10m` to prevent docker instances from suffocating the host system over time.
+- **Healthchecks**: Els serveis tenen sondes integrades (com `pg_isready`,
+  `curl`, `wget`) que comproven constantment la disponibilitat.
+- **Ordre de preparació**: En lloc del simple ordre d'arrencada, fem servir
+  `condition: service_healthy` a través de Compose. Per exemple, `backend`
+  aturarà completament l'arrencada fins que Postgres emeti estat llest,
+  eliminant les condicions de carrera.
+- **Restriccions de recursos (`deploy.resources.limits`)**: Clau per a
+  l'escalabilitat multi-inquilí, restringim les capacitats de còmput
+  (fraccions de CPU i quota de RAM) per node.
+- **Restriccions de logs (`logging`)**: Limitem els logs locals a
+  `json-file: 10m` per evitar que les instàncies docker saturin el sistema
+  host amb el temps.
 
-## Configuration
+## Configuració
 
-Configuration is externalised with environment variables, never baked
-into images or hard-coded in `docker-compose.yml`:
+La configuració s'externalitza amb variables d'entorn, mai s'inclou
+a les imatges ni es codifica directament a `docker-compose.yml`:
 
-- **`.env.example`** — template with placeholder values. Committed to
-  git so any teammate can reproduce the setup.
-- **`.env`** — real values for the local environment. **Ignored by git**
-  (see `.gitignore`) because it may contain credentials.
-- **Substitution:** `docker-compose` automatically loads `.env` from the
-  same directory as `docker-compose.yml` and substitutes
-  `${VAR}` / `${VAR:-default}` expressions before starting services.
+- **`.env.example`** — plantilla amb valors de substitució. Commitat a
+  git perquè qualsevol membre de l'equip pugui reproduir la configuració.
+- **`.env`** — valors reals per a l'entorn local. **Ignorat per git**
+  (vegeu `.gitignore`) perquè pot contenir credencials.
+- **Substitució:** `docker-compose` carrega automàticament `.env` des del
+  mateix directori que `docker-compose.yml` i substitueix
+  expressions `${VAR}` / `${VAR:-default}` abans d'iniciar els serveis.
 
-| Variable            | Used by   | Purpose                                     |
-|---------------------|-----------|---------------------------------------------|
-| `NGINX_PORT`        | nginx     | Host port exposing the site (default 80)    |
-| `BACKEND_PORT`      | backend   | Internal port of the Node.js server         |
-| `POSTGRES_USER`     | postgres  | Admin user created on first boot            |
-| `POSTGRES_PASSWORD` | postgres  | Admin password                              |
-| `POSTGRES_DB`       | postgres  | Initial database name                       |
+| Variable            | Usat per  | Propòsit                                      |
+|---------------------|-----------|-----------------------------------------------|
+| `NGINX_PORT`        | nginx     | Port del host que exposa el lloc (defecte 80) |
+| `BACKEND_PORT`      | backend   | Port intern del servidor Node.js              |
+| `POSTGRES_USER`     | postgres  | Usuari administrador creat al primer arrencament |
+| `POSTGRES_PASSWORD` | postgres  | Contrasenya d'administrador                   |
+| `POSTGRES_DB`       | postgres  | Nom de la base de dades inicial               |
 
-To bootstrap a fresh clone: `cp .env.example .env` and edit as needed.
+Per iniciar un clon nou: `cp .env.example .env` i editar-lo com calgui.
 
-## Volumes
+## Volums
 
-Only one named volume is defined:
+Només es defineix un volum amb nom:
 
-- **`postgres_data`** — mounted at `/var/lib/postgresql/data` inside the
-  `postgres` container. Contains all database files: the cluster
-  itself, the `greendevcorp` database, tables, indexes, and WAL logs.
+- **`postgres_data`** — muntat a `/var/lib/postgresql/data` dins del
+  contenidor `postgres`. Conté tots els fitxers de la base de dades: el
+  clúster en si mateix, la base de dades `greendevcorp`, taules, índexs i
+  logs WAL.
 
-**What survives `docker-compose down`:** everything in `postgres_data`.
-The command removes the containers but leaves named volumes intact.
-Only `docker-compose down -v` would also delete the volume.
+**Què sobreviu a `docker-compose down`:** tot allò a `postgres_data`.
+La comanda elimina els contenidors però deixa els volums amb nom intactes.
+Només `docker-compose down -v` eliminaria també el volum.
 
-**How we verified persistence:**
+**Com hem verificat la persistència:**
 
 ```bash
-# 1. Stack up
+# 1. Stack en funcionament
 docker-compose up -d
 
-# 2. Create a row in postgres
+# 2. Crear una fila a postgres
 docker-compose exec postgres \
   psql -U greendevcorp -d greendevcorp \
   -c "CREATE TABLE IF NOT EXISTS notes (msg TEXT);
       INSERT INTO notes VALUES ('persistence test');"
 
-# 3. Tear the stack down (containers gone, volume kept)
+# 3. Aturar el stack (contenidors eliminats, volum conservat)
 docker-compose down
 
-# 4. Bring it back up
+# 4. Tornar a engegar-lo
 docker-compose up -d
 
-# 5. The row is still there
+# 5. La fila segueix allà
 docker-compose exec postgres \
   psql -U greendevcorp -d greendevcorp -c "SELECT * FROM notes;"
 # → "persistence test"
 ```
 
-## How to Run
+## Com executar
 
 ```bash
-# from week9/
-cp .env.example .env          # Persona B will provide .env.example
-docker-compose up -d --build  # build images and start the stack
-docker-compose ps             # verify all services are Up
+# des de week9/
+cp .env.example .env          # editar amb les credencials reals
+docker-compose up -d --build  # construir imatges i engegar el stack
+docker-compose ps             # verificar que tots els serveis estan actius
 ```
 
-## Verification / Smoke Tests
+## Verificació / Smoke tests
 
 ```bash
-# 1. Static page served by nginx
+# 1. Pàgina estàtica servida per nginx
 curl http://localhost/
 
-# 2. Nginx health endpoint
+# 2. Endpoint de salut de Nginx
 curl http://localhost/health
 
 # 3. Reverse proxy: nginx → backend
 curl http://localhost/api/
 
-# 4. Inter-service DNS (from inside the nginx container)
+# 4. DNS entre serveis (des de dins del contenidor nginx)
 docker-compose exec nginx curl http://backend:3000/health
 
-# 5. Persistence: bring the stack down (keep volumes) and back up
+# 5. Persistència: aturar el stack (conservar volums) i tornar a engegar
 docker-compose down
 docker-compose up -d
-# Data in postgres_data must still be there (see Persona B section).
+# Les dades a postgres_data han de seguir allà (vegeu la secció de Volums).
 ```
 
-## Troubleshooting
+## Resolució de problemes
 
-- `docker-compose logs <service>` — inspect a single service's output.
-- `docker-compose ps` — see which containers are healthy.
-- `docker network inspect week9_greendevcorp-net` — verify all services
-  are attached to the same network.
-- `502 Bad Gateway` on `/api/` usually means the backend is not yet
-  ready; check `docker-compose logs backend`.
+- `docker-compose logs <servei>` — inspeccionar la sortida d'un servei individual.
+- `docker-compose ps` — veure quins contenidors estan sans.
+- `docker network inspect week9_greendevcorp-net` — verificar que tots els serveis
+  estan connectats a la mateixa xarxa.
+- `502 Bad Gateway` a `/api/` normalment significa que el backend no està
+  llest; comprovar `docker-compose logs backend`.
 
-## Authors
+## Passos pendents / Propers passos
 
-- Persona A: nginx service, architecture diagram, reverse-proxy config.
-- Persona B: backend service, postgres + volume, env configuration.
+El nivell **bàsic (\*)** és complet i verificat d'extrem a extrem.
 
-## Pending / Next Steps
+### Intermedi (\*\*) — recomanat, puja la nota de 5-7 a 8-9
 
-The **core (\*)** tier is complete and verified end-to-end. The
-following items are still open:
-
-### Intermediate (\*\*) — recommended, bumps grade from 5–7 to 8–9
-
-- [x] Add `healthcheck:` to each of the three services:
+- [x] Afegir `healthcheck:` a cadascun dels tres serveis:
   - nginx: `curl -f http://localhost:8080/health`
   - backend: `wget -q -O - http://localhost:3000/health`
   - postgres: `pg_isready -U ${POSTGRES_USER}`
-- [x] Replace the plain `depends_on:` lists with the long form using
-  `condition: service_healthy`, so that:
-  - backend only starts once postgres is ready to accept connections.
-  - nginx only starts once the backend is actually healthy (no more
-    transient `502 Bad Gateway` on first boot).
-- [x] Add a short section in this document explaining *why* health
-  checks + ordered readiness matter (not just "start order").
+- [x] Substituir les llistes `depends_on:` senzilles per la forma llarga amb
+  `condition: service_healthy`, de manera que:
+  - el backend només s'inicia quan postgres està llest per acceptar connexions.
+  - nginx només s'inicia quan el backend és realment sa (no més
+    `502 Bad Gateway` transitoris en el primer arrencament).
+- [x] Afegir una secció curta en aquest document explicant *per què* els
+  health checks + l'ordre de preparació importen (no només "l'ordre d'arrencada").
 
-### Advanced (\*\*\*) — optional, targets a 10
+### Avançat (\*\*\*) — opcional, apunta a un 10
 
-- [x] Configure a `logging:` driver per service with size limits (e.g.
-  `json-file` with `max-size: 10m`, `max-file: 3`) so logs cannot fill
-  the disk.
-- [x] Add resource limits (`deploy.resources.limits` for CPU and
-  memory) to each service and document the chosen values.
-- [x] Custom networks beyond the single bridge (e.g. separate the
-  database into its own network only reachable by the backend).
-
-
-### Housekeeping
-
-- [ ] Git commits from both authors (evidence of collaboration is part
-  of the grading rubric). Make sure `git config user.name` and
-  `user.email` are set correctly on each machine before committing.
-- [ ] Quick README at the repo root (or a link from it) pointing to
-  this document.
+- [x] Configurar un driver `logging:` per servei amb límits de mida (per exemple
+  `json-file` amb `max-size: 10m`, `max-file: 3`) perquè els logs no puguin
+  omplir el disc.
+- [x] Afegir límits de recursos (`deploy.resources.limits` per a CPU i
+  memòria) a cada servei i documentar els valors escollits.
+- [x] Xarxes personalitzades més enllà del pont únic (per exemple, separar
+  la base de dades en la seva pròpia xarxa accessible només per al backend).

@@ -1,6 +1,6 @@
 services:
   # ---------------------------------------------------------------------------
-  # Persona A — nginx (frontend / reverse proxy)
+  # nginx (frontend / reverse proxy)
   # ---------------------------------------------------------------------------
   nginx:
     build: ./nginx
@@ -31,7 +31,7 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
-  # Persona B — backend (Node.js app)
+  # backend (aplicació Node.js amb mètriques Prometheus a /metrics)
   # ---------------------------------------------------------------------------
   backend:
     build: ./application
@@ -63,7 +63,7 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
-  # Persona B — postgres (database with persistent volume)
+  # postgres (base de dades amb volum persistent)
   # ---------------------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
@@ -93,11 +93,104 @@ services:
           memory: 512M
     restart: unless-stopped
 
+  # ---------------------------------------------------------------------------
+  # Prometheus (fa scraping del backend + node-exporter)
+  # ---------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: greendevcorp-prometheus
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -q -O - http://localhost:9090/-/healthy || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - frontend-net
+      - monitoring-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Grafana (dashboards sobre Prometheus)
+  # ---------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: greendevcorp-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-changeme}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3001:3000"
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -q -O - http://localhost:3000/api/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - prometheus
+    networks:
+      - monitoring-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Node Exporter (mètriques del sistema host/VM)
+  # ---------------------------------------------------------------------------
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: greendevcorp-node-exporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - monitoring-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+    restart: unless-stopped
+
 networks:
   frontend-net:
     driver: bridge
   backend-net:
     driver: bridge
+  monitoring-net:
+    driver: bridge
 
 volumes:
   postgres_data:
+  prometheus_data:
+  grafana_data:
