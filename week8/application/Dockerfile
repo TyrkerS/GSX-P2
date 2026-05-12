@@ -12,6 +12,9 @@ COPY app.js .
 # Nivell Intermedi i Avançat: Imatge base mínima i Optimització de Capes
 FROM node:20-alpine
 
+# Actualitzar npm per corregir vulnerabilitats en les seves dependències internes
+RUN npm install -g npm@latest --no-fund --no-audit
+
 # Nivell Avançat (***): Hardening de Seguretat - Creem i utilitzem un usuari sense privilegis
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 

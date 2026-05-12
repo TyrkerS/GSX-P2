@@ -80,14 +80,12 @@ GSX-P2/
 
 ## Què s'ha construït
 
-| Setmana | Tema | Nivell |
-|---------|------|--------|
-| 8 | Docker: builds multistage, usuaris no root, instrumentació de mètriques Prometheus | ★★★ Avançat |
-| 9 | Docker Compose: 3 serveis d'app + 3 serveis de monitoratge, xarxes personalitzades, healthchecks, límits de recursos | ★★★ Avançat |
-| 10 | Kubernetes: Deployments, StatefulSet (postgres + PVC), sondes, escalat, auto-recuperació | ★★★ Avançat |
-| 11 | Terraform IaC + GitHub Actions CI (cache Buildx + escaneig Trivy + validació Terraform) | ★★★ Avançat |
-| 12 | Disseny de xarxa (CIDR), NetworkPolicies zero-trust (Calico), estratègia d'identitat (LDAP/AD/SSO) | ★★ Intermedi |
-| 13 | Prometheus + dashboard Grafana, test d'integració complet, documentació completa | ★★ Intermedi |
+- **Setmana 8:** Dockerfiles multistage per al backend Node.js i el frontend Nginx, amb usuaris no root i mètriques Prometheus exposades a `/metrics`.
+- **Setmana 9:** Stack complet amb Docker Compose — nginx, backend, postgres, Prometheus, Grafana i node-exporter. Xarxes per nivell, healthchecks i límits de recursos.
+- **Setmana 10:** Desplegament a Kubernetes amb Deployments, StatefulSet per a Postgres (PVC), sondes de liveness/readiness i escalat horitzontal.
+- **Setmana 11:** Tota la infraestructura gestionada amb Terraform. Pipeline CI/CD amb GitHub Actions: build amb Buildx, escaneig de seguretat amb Trivy i validació de Terraform.
+- **Setmana 12:** Disseny de xarxa amb CIDR per entorns (dev/staging/prod). NetworkPolicies zero-trust amb Calico. Investigació sobre serveis core (DNS, DHCP, NTP) i estratègia d'identitat (LDAP, AD, SSO).
+- **Setmana 13:** Dashboard de Grafana amb mètriques de l'aplicació, test d'integració end-to-end i documentació completa del projecte.
 
 ---
 

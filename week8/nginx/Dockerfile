@@ -1,5 +1,8 @@
 FROM nginx:alpine
 
+# Actualitzar tots els paquets Alpine per incloure pedaços de seguretat
+RUN apk update && apk upgrade --no-cache
+
 # Nivell Avançat (***): Configuració non-root per a més seguretat
 RUN addgroup -S nginxgroup && adduser -S nginxuser -G nginxgroup
 
