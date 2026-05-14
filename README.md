@@ -72,8 +72,7 @@ GSX-P2/
     ├── ARCHITECTURE.md         diagrama complet del sistema + fluxos de dades
     ├── RUNBOOK.md              com desplegar, escalar, fer rollback, comprovar logs
     ├── TROUBLESHOOTING.md      problemes habituals i com diagnosticar-los
-    ├── Documentation.md        Repte A (observabilitat), B (test d'integració), C+D
-    └── REFLECTION_TEMPLATE.md  plantilla per als assaigs individuals
+    └── Documentation.md        Repte A (observabilitat), B (test d'integració), C+D + reflexions individuals
 ```
 
 ---
